@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漫画家AI助手</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="background">
+            <div class="classroom">
+                <div class="teacher"></div>
+            </div>
+        </div>
+        
+        <div class="chat-container">
+            <header>
+                <h1>漫画家AI助手</h1>
+                <p>与资深漫画家进行对话交流</p>
+                <div class="api-status">
+                    <span class="status-dot"></span>
+                    <span>API状态: 正常</span>
+                </div>
+            </header>
+            
+            <div class="chat-box" id="chatBox">
+                <div class="message bot-message">
+                    <div class="avatar">漫</div>
+                    <div class="content">
+                        <p>你好！我是一位资深漫画家，拥有20年的漫画创作经验。无论是角色设计、故事构思还是绘画技巧，我都可以为你提供专业建议。有什么问题想问我吗？</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <div class="input-container">
+                    <input type="text" id="userInput" placeholder="请输入您的问题..." maxlength="500">
+                    <button id="sendButton">发送</button>
+                </div>
+                <div class="hint">按Enter键发送消息</div>
+                <div class="api-info">
+                    使用讯飞星火大模型，完全免费服务
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
