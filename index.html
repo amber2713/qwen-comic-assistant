@@ -3,50 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>漫画家AI助手</title>
+    <title>Qwen3-1.7B 对话助手</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <div class="background">
-            <div class="classroom">
-                <div class="teacher"></div>
+    <div class="app">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="logo">
+                <i class="fas fa-brain"></i>
+                <h2>Qwen助手</h2>
             </div>
-        </div>
-        
-        <div class="chat-container">
-            <header>
-                <h1>漫画家AI助手</h1>
-                <p>与资深漫画家进行对话交流</p>
-                <div class="api-status">
-                    <span class="status-dot"></span>
-                    <span>API状态: 正常</span>
-                </div>
-            </header>
             
-            <div class="chat-box" id="chatBox">
-                <div class="message bot-message">
-                    <div class="avatar">漫</div>
-                    <div class="content">
-                        <p>你好！我是一位资深漫画家，拥有20年的漫画创作经验。无论是角色设计、故事构思还是绘画技巧，我都可以为你提供专业建议。有什么问题想问我吗？</p>
+            <div class="model-info">
+                <div class="info-item">
+                    <span class="label">模型:</span>
+                    <span class="value">Qwen3-1.7B</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">状态:</span>
+                    <span class="status online"><i class="fas fa-circle"></i> 在线</span>
+                </div>
+            </div>
+            
+            <button class="new-chat" onclick="newChat()">
+                <i class="fas fa-plus"></i> 新对话
+            </button>
+            
+            <div class="api-config">
+                <h3><i class="fas fa-key"></i> API配置</h3>
+                <div class="config-details">
+                    <div class="config-item">
+                        <span>服务: random wander</span>
+                    </div>
+                    <div class="config-item">
+                        <span>端点: https://maas-api.cn-huabel-1.xf-yun.com/v1</span>
                     </div>
                 </div>
             </div>
-            
-            <div class="input-area">
-                <div class="input-container">
-                    <input type="text" id="userInput" placeholder="请输入您的问题..." maxlength="500">
-                    <button id="sendButton">发送</button>
+        </div>
+
+        <!-- 主聊天区域 -->
+        <div class="main-content">
+            <div class="chat-header">
+                <h1><i class="fas fa-robot"></i> AI对话助手</h1>
+                <div class="controls">
+                    <button onclick="exportChat()" title="导出对话">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button onclick="clearChat()" title="清空对话">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
-                <div class="hint">按Enter键发送消息</div>
-                <div class="api-info">
-                    使用讯飞星火大模型，完全免费服务
+            </div>
+
+            <div class="chat-container" id="chatContainer">
+                <!-- 消息会在这里显示 -->
+                <div class="message ai first">
+                    <div class="avatar">AI</div>
+                    <div class="content">
+                        <div class="text">
+                            你好！我是基于Qwen3-1.7B模型的智能助手。我可以回答各种问题、进行对话交流、提供建议等。
+                            有什么可以帮助您的吗？
+                        </div>
+                        <div class="time">现在</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <div class="input-box">
+                        <textarea 
+                            id="messageInput" 
+                            placeholder="输入消息... (Enter发送，Shift+Enter换行)"
+                            rows="1"
+                            oninput="autoResize(this)"
+                            onkeydown="handleKeyDown(event)"
+                        ></textarea>
+                        <div class="input-actions">
+                            <button class="send-btn" onclick="sendMessage()">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="input-hint">
+                        <span class="hint"><i class="fas fa-info-circle"></i> 基于讯飞星火API的Qwen3-1.7B模型</span>
+                        <span class="token-count" id="tokenCount">长度: 0</span>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <!-- 加载指示器 -->
+        <div id="loading" class="loading-overlay">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>AI正在思考...</p>
+            </div>
+        </div>
     </div>
-    
-    <script src="script.js"></script>
+
+    <!-- 引入配置和主逻辑 -->
+    <script src="config.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
