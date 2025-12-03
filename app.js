@@ -32,11 +32,12 @@ class ChatState {
         return this.messages.reduce((total, msg) => total + msg.content.length, 0);
     }
 
+    // 移除 updateTokenDisplay 调用，只做token检查
     checkTokenLimit() {
         while (this.getTokenCount() > CONFIG.MAX_TOKENS && this.messages.length > 1) {
             this.messages.splice(1, 1); // 保留第一条欢迎消息
         }
-        this.updateTokenDisplay();
+        // 注意：这里不再调用 updateTokenDisplay，让外部调用者处理
     }
 
     clear() {
@@ -60,7 +61,13 @@ class ChatState {
         try {
             const saved = localStorage.getItem('qwen_chat_history');
             if (saved) {
-                this.messages = JSON.parse(saved);
+                const parsed = JSON.parse(saved);
+                // 确保至少有一条消息
+                this.messages = parsed.length > 0 ? parsed : [{
+                    role: "assistant",
+                    content: CONFIG.WELCOME_MESSAGE,
+                    timestamp: new Date()
+                }];
             }
         } catch (e) {
             console.warn('读取本地存储失败:', e);
@@ -86,6 +93,7 @@ class APIClient {
 
         // 检查token限制
         this.chatState.checkTokenLimit();
+        this.updateTokenDisplay();  // 在这里更新token显示
 
         // 显示AI消息占位符
         const aiMessage = this.chatState.addMessage("assistant", "");
@@ -151,8 +159,8 @@ class APIClient {
             }
 
             // 更新消息内容
-            aiMessage.content = fullResponse;
-            this.chatState.messages[this.chatState.messages.length - 1].content = fullResponse;
+            const lastIndex = this.chatState.messages.length - 1;
+            this.chatState.messages[lastIndex].content = fullResponse;
             this.chatState.saveToLocalStorage();
 
         } catch (error) {
@@ -162,14 +170,14 @@ class APIClient {
             aiMessageElement.querySelector('.text').innerHTML = 
                 `<span style="color: #ff4757">错误: ${error.message}</span>`;
             
-            aiMessage.content = `错误: ${error.message}`;
-            this.chatState.messages[this.chatState.messages.length - 1].content = `错误: ${error.message}`;
+            const lastIndex = this.chatState.messages.length - 1;
+            this.chatState.messages[lastIndex].content = `错误: ${error.message}`;
             
         } finally {
             // 清理状态
             this.chatState.isGenerating = false;
             this.showLoading(false);
-            this.chatState.updateTokenDisplay();
+            this.updateTokenDisplay();  // 完成后更新token显示
         }
     }
 
@@ -198,6 +206,7 @@ class APIClient {
     }
 
     formatMessage(text) {
+        if (!text) return '';
         // 简单的Markdown支持
         return text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -238,6 +247,8 @@ class APIClient {
 
     updateTokenDisplay() {
         const tokenCount = document.getElementById('tokenCount');
+        if (!tokenCount) return;
+        
         const count = this.chatState.getTokenCount();
         const percentage = Math.min(100, (count / CONFIG.MAX_TOKENS) * 100);
         
@@ -255,6 +266,7 @@ let app = null;
 
 // 辅助函数
 function autoResize(textarea) {
+    if (!textarea) return;
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
 }
@@ -268,6 +280,8 @@ function handleKeyDown(event) {
 
 function sendMessage() {
     const input = document.getElementById('messageInput');
+    if (!input) return;
+    
     const message = input.value.trim();
     
     if (!message) return;
@@ -284,7 +298,10 @@ function newChat() {
     if (confirm('确定要开始新对话吗？当前对话历史将被清除。')) {
         if (app && app.chatState) {
             app.chatState.clear();
-            document.getElementById('chatContainer').innerHTML = '';
+            const container = document.getElementById('chatContainer');
+            if (container) {
+                container.innerHTML = '';
+            }
             app.displayMessage(app.chatState.messages[0]);
             app.updateTokenDisplay();
         }
@@ -333,16 +350,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 显示历史消息
     const container = document.getElementById('chatContainer');
-    container.innerHTML = '';
-    app.chatState.messages.forEach(msg => {
-        app.displayMessage(msg);
-    });
+    if (container) {
+        container.innerHTML = '';
+        app.chatState.messages.forEach(msg => {
+            app.displayMessage(msg);
+        });
+    }
     
     // 更新token显示
     app.updateTokenDisplay();
     
     // 聚焦输入框
-    document.getElementById('messageInput').focus();
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) {
+        messageInput.focus();
+    }
     
     console.log('Qwen聊天助手已初始化');
 });
