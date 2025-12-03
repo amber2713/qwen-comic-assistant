@@ -32,12 +32,13 @@ class ChatState {
         return this.messages.reduce((total, msg) => total + msg.content.length, 0);
     }
 
-    // 移除 updateTokenDisplay 调用，只做token检查
+    // 修复：移除 updateTokenDisplay 调用
     checkTokenLimit() {
         while (this.getTokenCount() > CONFIG.MAX_TOKENS && this.messages.length > 1) {
             this.messages.splice(1, 1); // 保留第一条欢迎消息
         }
-        // 注意：这里不再调用 updateTokenDisplay，让外部调用者处理
+        // 注意：updateTokenDisplay 由 APIClient 调用，不在这里调用
+        return this.messages; // 返回更新后的消息数组
     }
 
     clear() {
@@ -47,6 +48,7 @@ class ChatState {
             timestamp: new Date()
         }];
         this.saveToLocalStorage();
+        return this.messages;
     }
 
     saveToLocalStorage() {
@@ -62,7 +64,6 @@ class ChatState {
             const saved = localStorage.getItem('qwen_chat_history');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                // 确保至少有一条消息
                 this.messages = parsed.length > 0 ? parsed : [{
                     role: "assistant",
                     content: CONFIG.WELCOME_MESSAGE,
@@ -72,6 +73,7 @@ class ChatState {
         } catch (e) {
             console.warn('读取本地存储失败:', e);
         }
+        return this.messages;
     }
 }
 
@@ -79,6 +81,7 @@ class ChatState {
 class APIClient {
     constructor() {
         this.chatState = new ChatState();
+        this.updateTokenDisplay(); // 初始化时更新token显示
     }
 
     async sendMessage(messageText) {
@@ -91,9 +94,9 @@ class APIClient {
         const userMessage = this.chatState.addMessage("user", messageText);
         this.displayMessage(userMessage);
 
-        // 检查token限制
+        // 检查token限制并更新显示
         this.chatState.checkTokenLimit();
-        this.updateTokenDisplay();  // 在这里更新token显示
+        this.updateTokenDisplay();
 
         // 显示AI消息占位符
         const aiMessage = this.chatState.addMessage("assistant", "");
@@ -105,6 +108,9 @@ class APIClient {
 
         try {
             // 准备API请求
+            console.log('发送请求到:', CONFIG.HTTP_ENDPOINT);
+            console.log('使用API Key:', CONFIG.API_KEY.substring(0, 20) + '...');
+            
             const response = await fetch(CONFIG.HTTP_ENDPOINT, {
                 method: 'POST',
                 headers: {
@@ -120,8 +126,11 @@ class APIClient {
                 })
             });
 
+            console.log('响应状态:', response.status);
+            
             if (!response.ok) {
-                throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`API请求失败: ${response.status} ${response.statusText}\n${errorText}`);
             }
 
             // 处理流式响应
@@ -152,7 +161,7 @@ class APIClient {
                                 this.scrollToBottom();
                             }
                         } catch (e) {
-                            console.warn('解析数据失败:', e);
+                            console.warn('解析数据失败:', e, '原始数据:', line);
                         }
                     }
                 }
@@ -177,7 +186,7 @@ class APIClient {
             // 清理状态
             this.chatState.isGenerating = false;
             this.showLoading(false);
-            this.updateTokenDisplay();  // 完成后更新token显示
+            this.updateTokenDisplay();
         }
     }
 
@@ -246,8 +255,8 @@ class APIClient {
     }
 
     updateTokenDisplay() {
-        const tokenCount = document.getElementById('tokenCount');
-        if (!tokenCount) return;
+        const tokenCountElement = document.getElementById('tokenCount');
+        if (!tokenCountElement) return;
         
         const count = this.chatState.getTokenCount();
         const percentage = Math.min(100, (count / CONFIG.MAX_TOKENS) * 100);
@@ -256,8 +265,8 @@ class APIClient {
         if (percentage > 70) color = '#FFC107';
         if (percentage > 90) color = '#FF5252';
         
-        tokenCount.textContent = `长度: ${count} (${Math.round(percentage)}%)`;
-        tokenCount.style.color = color;
+        tokenCountElement.textContent = `长度: ${count} (${Math.round(percentage)}%)`;
+        tokenCountElement.style.color = color;
     }
 }
 
@@ -280,17 +289,26 @@ function handleKeyDown(event) {
 
 function sendMessage() {
     const input = document.getElementById('messageInput');
-    if (!input) return;
+    if (!input) {
+        console.error('找不到输入框元素');
+        return;
+    }
     
     const message = input.value.trim();
     
-    if (!message) return;
+    if (!message) {
+        alert('请输入消息内容');
+        return;
+    }
     
     input.value = '';
     autoResize(input);
     
     if (app) {
         app.sendMessage(message);
+    } else {
+        console.error('应用未初始化');
+        alert('应用初始化失败，请刷新页面重试');
     }
 }
 
@@ -316,7 +334,7 @@ function clearChat() {
 }
 
 function exportChat() {
-    if (!app || !app.chatState.messages.length) {
+    if (!app || !app.chatState.messages || app.chatState.messages.length === 0) {
         alert('没有对话内容可导出');
         return;
     }
@@ -325,46 +343,60 @@ function exportChat() {
     
     app.chatState.messages.forEach(msg => {
         const role = msg.role === 'user' ? '用户' : 'AI助手';
-        const time = app.formatTime(msg.timestamp);
+        const time = app.formatTime ? app.formatTime(msg.timestamp) : new Date(msg.timestamp).toLocaleString();
         exportText += `[${time}] ${role}:\n${msg.content}\n\n`;
     });
     
-    const blob = new Blob([exportText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `qwen-chat-${new Date().getTime()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+        const blob = new Blob([exportText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `qwen-chat-${new Date().getTime()}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error('导出失败:', e);
+        alert('导出失败: ' + e.message);
+    }
 }
 
 // 初始化应用
 document.addEventListener('DOMContentLoaded', () => {
-    // 创建应用实例
-    app = new APIClient();
-    
-    // 加载历史记录
-    app.chatState.loadFromLocalStorage();
-    
-    // 显示历史消息
-    const container = document.getElementById('chatContainer');
-    if (container) {
-        container.innerHTML = '';
-        app.chatState.messages.forEach(msg => {
-            app.displayMessage(msg);
-        });
+    try {
+        // 创建应用实例
+        app = new APIClient();
+        
+        // 加载历史记录
+        app.chatState.loadFromLocalStorage();
+        
+        // 显示历史消息
+        const container = document.getElementById('chatContainer');
+        if (container) {
+            container.innerHTML = '';
+            app.chatState.messages.forEach(msg => {
+                app.displayMessage(msg);
+            });
+        }
+        
+        // 更新token显示
+        app.updateTokenDisplay();
+        
+        // 聚焦输入框
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput) {
+            messageInput.focus();
+            // 添加输入框事件监听
+            messageInput.addEventListener('input', function() {
+                autoResize(this);
+            });
+        }
+        
+        console.log('Qwen聊天助手已初始化成功');
+    } catch (error) {
+        console.error('应用初始化失败:', error);
+        alert('应用初始化失败: ' + error.message);
     }
-    
-    // 更新token显示
-    app.updateTokenDisplay();
-    
-    // 聚焦输入框
-    const messageInput = document.getElementById('messageInput');
-    if (messageInput) {
-        messageInput.focus();
-    }
-    
-    console.log('Qwen聊天助手已初始化');
 });
